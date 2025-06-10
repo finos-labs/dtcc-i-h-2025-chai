@@ -1,0 +1,3 @@
+[submodule "mcp-dtcc"]
+	path = mcp-dtcc
+	url = git@github.com:D-Vspec/mcp-dtcc.git
