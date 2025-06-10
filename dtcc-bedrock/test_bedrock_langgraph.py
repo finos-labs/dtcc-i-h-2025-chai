@@ -15,7 +15,6 @@ def test_bedrock_connection():
     )
 
     model_id = "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0"
-    # Claude 3.5 models require the Messages API format and an anthropic_version field
     payload = {
         "anthropic_version": "bedrock-2023-05-31",
         "messages": [
