@@ -50,8 +50,11 @@ categorization rules:
 - transport: fuel, parking, public transport, ride-sharing, car services
 - utilities: electricity, water, gas, internet, phone bills
 - healthcare: medical, pharmacy, insurance, dental
-- transfer: bank transfers, atm withdrawals, peer-to-peer payments
-- unknown: unclear or unidentifiable transactions`
+- peer-to-peer: peer-to-peer payments
+- investment : stocks, bonds, mutual funds, retirement accounts
+- unknown: unclear or unidentifiable transactions
+- bank transfer: transfers between accounts, bank fees, interest payments
+- subsciption: recurring payments for services, memberships, or software (airtel, netflix, google play,etc.)`
 
 function isValidTransaction(transaction: unknown): transaction is Transaction {
   return (
@@ -133,8 +136,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<Extractio
             ],
           },
         ],
+        temperature: 1,
         model: VISION_MODEL,
-        max_tokens: 2000,
+        max_tokens: 8192,
       })
 
       const pageResult = chatCompletion.choices[0]?.message?.content
@@ -190,6 +194,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<Extractio
     const result: ExtractionResponse = {
       initial_balance: initialBalance,
       transactions: allTransactions
+    }
+
+    try {
+      await fetch("http://localhost:8000/store-financial-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          initial_balance: initialBalance ?? 0,
+          transactions: allTransactions,
+        }),
+      })
+    } catch (vectorErr) {
+      console.error("Error sending data to vector DB:", vectorErr)
+      // Continue even if vectorization fails
     }
 
     return NextResponse.json(result)

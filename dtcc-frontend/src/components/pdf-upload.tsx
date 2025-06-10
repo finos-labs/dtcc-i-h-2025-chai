@@ -48,6 +48,17 @@ export function PdfUpload({ onAnalysisComplete }: PdfUploadProps) {
     setStatus("")
   }
 
+  const downloadImages = (images: string[]) => {
+    images.forEach((base64, idx) => {
+      const link = document.createElement("a")
+      link.href = `data:image/jpeg;base64,${base64}`
+      link.download = `statement_page_${idx + 1}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    })
+  }
+
   const processFile = async () => {
     if (!file) return
 
@@ -59,7 +70,6 @@ export function PdfUpload({ onAnalysisComplete }: PdfUploadProps) {
     try {
       // Dynamically import PDF.js
       const pdfjs = await import("pdfjs-dist")
-      // Set up PDF.js worker
       pdfjs.GlobalWorkerOptions.workerSrc = new URL(
         'pdfjs-dist/build/pdf.worker.min.mjs',
         import.meta.url,
@@ -68,13 +78,11 @@ export function PdfUpload({ onAnalysisComplete }: PdfUploadProps) {
       setProgress(10)
       setStatus("Reading PDF file...")
 
-      // Convert file to array buffer
       const arrayBuffer = await file.arrayBuffer()
 
       setProgress(20)
       setStatus("Loading PDF document...")
 
-      // Load PDF document
       const pdf = await pdfjs.getDocument({
         data: arrayBuffer,
         verbosity: 0,
@@ -85,71 +93,92 @@ export function PdfUpload({ onAnalysisComplete }: PdfUploadProps) {
 
       const images: string[] = []
 
-      // Convert each page to image
+      // Improved pre-processing: higher scale, adaptive canvas size, and better JPEG quality
+      const TARGET_DPI = 500 // doubled from 300
+      const BASE_DPI = 72
+      const SCALE = TARGET_DPI / BASE_DPI // ~8.33
+
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         try {
           const page = await pdf.getPage(pageNum)
-          const viewport = page.getViewport({ scale: 1.5 })
+          const viewport = page.getViewport({ scale: SCALE })
 
-          // Create original canvas
+          // Create high-res canvas
           const canvas = document.createElement("canvas")
           const context = canvas.getContext("2d")
           if (!context) {
             throw new Error("Failed to get canvas context")
           }
-          canvas.height = viewport.height
-          canvas.width = viewport.width
+          canvas.width = Math.ceil(viewport.width)
+          canvas.height = Math.ceil(viewport.height)
 
-          // Render page to original canvas
+          // Render page to high-res canvas
           await page.render({
             canvasContext: context,
             viewport: viewport,
+            // Optional: enable intent for print rendering
+            intent: "print"
           }).promise
 
-          // --- Preprocess: Draw onto a fixed resolution canvas ---
-          const FIXED_WIDTH = 1280
-          const FIXED_HEIGHT = 1800
-          const fixedCanvas = document.createElement("canvas")
-          fixedCanvas.width = FIXED_WIDTH
-          fixedCanvas.height = FIXED_HEIGHT
-          const fixedCtx = fixedCanvas.getContext("2d")
-          if (!fixedCtx) {
-            throw new Error("Failed to get fixed canvas context")
+          // Optional: sharpen filter (simple convolution kernel)
+          try {
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+            const data = imageData.data
+            // Simple sharpening kernel
+            const kernel = [
+              0, -1,  0,
+             -1,  5, -1,
+              0, -1,  0
+            ]
+            const w = canvas.width
+            const h = canvas.height
+            const copy = new Uint8ClampedArray(data)
+            for (let y = 1; y < h - 1; y++) {
+              for (let x = 1; x < w - 1; x++) {
+                for (let c = 0; c < 3; c++) {
+                  let i = (y * w + x) * 4 + c
+                  let sum = 0
+                  sum += kernel[0] * copy[((y - 1) * w + (x - 1)) * 4 + c]
+                  sum += kernel[1] * copy[((y - 1) * w + (x    )) * 4 + c]
+                  sum += kernel[2] * copy[((y - 1) * w + (x + 1)) * 4 + c]
+                  sum += kernel[3] * copy[((y    ) * w + (x - 1)) * 4 + c]
+                  sum += kernel[4] * copy[((y    ) * w + (x    )) * 4 + c]
+                  sum += kernel[5] * copy[((y    ) * w + (x + 1)) * 4 + c]
+                  sum += kernel[6] * copy[((y + 1) * w + (x - 1)) * 4 + c]
+                  sum += kernel[7] * copy[((y + 1) * w + (x    )) * 4 + c]
+                  sum += kernel[8] * copy[((y + 1) * w + (x + 1)) * 4 + c]
+                  data[i] = Math.min(255, Math.max(0, sum))
+                }
+              }
+            }
+            context.putImageData(imageData, 0, 0)
+          } catch (e) {
+            // If filter fails, continue without it
           }
-          // Fill white background (optional, for PDFs with transparency)
-          fixedCtx.fillStyle = "#fff"
-          fixedCtx.fillRect(0, 0, FIXED_WIDTH, FIXED_HEIGHT)
-          // Draw the rendered page scaled to fit the fixed canvas
-          fixedCtx.drawImage(
-            canvas,
-            0, 0, canvas.width, canvas.height,
-            0, 0, FIXED_WIDTH, FIXED_HEIGHT
-          )
 
-          // Convert fixed canvas to base64 image
-          const imageData = fixedCanvas.toDataURL("image/jpeg", 0.8)
+          // Convert canvas to high-quality JPEG
+          const imageData = canvas.toDataURL("image/jpeg", 0.95)
           const base64 = imageData.split(",")[1]
 
           if (base64 && base64.length > 100) {
             images.push(base64)
           }
 
-          // Update progress
           const pageProgress = 30 + (pageNum / pdf.numPages) * 40
           setProgress(pageProgress)
           setStatus(`Converted page ${pageNum}/${pdf.numPages}`)
 
-          // Clean up
           page.cleanup()
         } catch (pageError) {
           console.error(`Error processing page ${pageNum}:`, pageError)
-          // Continue with other pages
         }
       }
 
       if (images.length === 0) {
         throw new Error("No pages could be converted from the PDF. Please ensure it's a valid bank statement.")
       }
+
+      downloadImages(images)
 
       setProgress(70)
       setStatus(`Extracting transaction data from ${images.length} pages...`)
