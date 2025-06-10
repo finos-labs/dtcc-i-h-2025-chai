@@ -11,10 +11,17 @@
 # Secrets
 *.env
 
+# Vector databases
+finance_vector_db/
+*.sqlite3
+
 # Build directories
 dist
 site
 html
+
+# Binary Files
+*.bin
 
 # Virtual environments
 venv
