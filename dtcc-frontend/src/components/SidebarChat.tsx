@@ -25,21 +25,14 @@ const SidebarChat: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("http://localhost:8000/search-financial", {
+      const res = await fetch("http://localhost:8080/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: userInput }),
+        body: JSON.stringify({ message: userInput }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      let reply = "";
-      if (data.results && data.results.length > 0) {
-        reply = data.results[0].narrative || "No summary available.";
-      } else if (data.summary) {
-        reply = "No matching results, but here is a summary: " + JSON.stringify(data.summary);
-      } else {
-        reply = "No results found.";
-      }
+      let reply = data.response || "No response from LLM.";
       setMessages((msgs) => [...msgs, { role: "rag", content: reply }]);
     } catch (e: any) {
       setError("Error: " + e.message);
