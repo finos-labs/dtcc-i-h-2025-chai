@@ -13,8 +13,25 @@ export function TransactionTable({ data }: { data: AnalysisData }) {
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
-  // Get unique categories
-  const categories = Array.from(new Set(data.transaction_details.map((t) => t.type))).sort()
+  // Get unique categories (ensure all possible categories are included, even if not present in data)
+  const ALL_CATEGORIES = [
+    "food",
+    "shopping",
+    "leisure",
+    "transport",
+    "utilities",
+    "healthcare",
+    "transfer",
+    "investment",
+    "subscription",
+    "unknown",
+  ]
+  const categories = Array.from(
+    new Set([
+      ...ALL_CATEGORIES,
+      ...data.transaction_details.map((t) => t.type),
+    ])
+  ).sort()
 
   // Filter transactions
   const filteredTransactions = data.transaction_details.filter((transaction) => {
