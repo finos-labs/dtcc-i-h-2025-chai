@@ -136,7 +136,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Extractio
             ],
           },
         ],
-        temperature: 1,
+        temperature: 0.1,
         model: VISION_MODEL,
         max_tokens: 8192,
       })

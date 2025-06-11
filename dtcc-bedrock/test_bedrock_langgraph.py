@@ -25,7 +25,7 @@ chat_bedrock = ChatBedrock(
     model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
     region_name=os.getenv("AWS_REGION", "us-east-2"),
     model_kwargs={
-        "max_tokens": 2000,
+        "max_tokens": 8192,
         "temperature": 0.5,
         "top_p": 1,
     }
@@ -45,6 +45,12 @@ app.add_middleware(
 class AskRequest(BaseModel):
     message: str
 
+promt = """
+You are a financial data agent that can analyze and summarize financial transactions. You will receive a message containing transaction data and queries about it. Your task is to process this data and provide insights or answers based on the queries.
+Format your text properly and neatly using newlines and bullet points where appropriate. If you need to use tools, do so in a structured way. Do not include markdown syntax or json in your response. Keep your responses short and to the poiint. If you cant find details about a transaction fetch all of them and search for it there.
+Do not hallucinate\n
+"""
+
 @app.post("/ask")
 async def ask_agent(request: AskRequest):
     """
@@ -61,7 +67,8 @@ async def ask_agent(request: AskRequest):
 
                 # Create and run the agent
                 agent = create_react_agent(chat_bedrock, tools)
-                agent_response = await agent.ainvoke({"messages": message})
+                agent_response = await agent.ainvoke({"messages": f"{promt}\n{message}"})
+                print(f"Agent response: {agent_response}")
                 return agent_response
     result = await run_agent(request.message)
     return {"response": result['messages'][-1].content}
