@@ -1,58 +1,114 @@
-![badge-labs](https://user-images.githubusercontent.com/327285/230928932-7c75f8ed-e57b-41db-9fb7-a292a13a1e58.svg)
+# dtcc-i-h-2025-chai
 
-# DTCC AI Hackathon 2025: Empowering India's Innovators
-The purpose of hackathon is to leverage AI and ML Technologies to address critical challenges in the financial markets. The overall goal is to progress industry through Innovation, Networking and by providing effective Solutions.
+This repository is a private project under FINOS Labs. It primarily uses TypeScript and includes a Next.js-based frontend located in the `dtcc-frontend` directory.
 
-**Hackathon Key Dates** 
-•	June 6th - Event invites will be sent to participants
-•	June 9th - Hackathon Open
-•	June 9th-11th - Team collaboration and Use Case development
-•	June 12th - Team presentations & demos
-•	June 16th - Winners Announcement
+## Project Overview
 
-More Info - https://communications.dtcc.com/dtcc-ai-hackathon-registration-17810.html
+**dtcc-i-h-2025-chai** is the codebase for a modern web application, leveraging the Next.js framework for rapid development and scalability. The project is currently under active development and is intended for internal or partner use.
 
-Commit Early & Commit Often!!!
+## Features
 
-## Project Name
+- Built with Next.js (React 19)
+- Uses Radix UI components and Tailwind CSS for modern, accessible UI
+- Integrates with Amazon Bedrock for advanced AI and LLM capabilities
+- Includes an MCP (Main Control Plane) backend for core business logic and orchestration
+- Features RAG (Retrieval-Augmented Generation) functionality for enhanced information retrieval and generation
+- Integrates with OpenAI and Groq SDKs
+- Utilities for PDF parsing and charting
 
+## Prerequisites
 
-### Project Details
+- Node.js (version 18 or later recommended)
+- npm or yarn
 
+## Installation (Frontend)
 
-### Team Information
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/finos-labs/dtcc-i-h-2025-chai.git
+   cd dtcc-i-h-2025-chai/dtcc-frontend
+   ```
 
+2. Install dependencies:
+   ```sh
+   npm install
+   ```
+   or
+   ```sh
+   yarn install
+   ```
 
-## Using DCO to sign your commits
+## Launch Instructions (Frontend)
 
-**All commits** must be signed with a DCO signature to avoid being flagged by the DCO Bot. This means that your commit log message must contain a line that looks like the following one, with your actual name and email address:
+### Development Mode
 
+To run the app locally in development mode (with hot reload):
+
+```sh
+npm run dev
 ```
-Signed-off-by: John Doe <john.doe@example.com>
+or
+```sh
+yarn dev
 ```
 
-Adding the `-s` flag to your `git commit` will add that line automatically. You can also add it manually as part of your commit log message or add it afterwards with `git commit --amend -s`.
+### Production Mode
 
-See [CONTRIBUTING.md](./.github/CONTRIBUTING.md) for more information
+To build and start the app for production:
 
-### Helpful DCO Resources
-- [Git Tools - Signing Your Work](https://git-scm.com/book/en/v2/Git-Tools-Signing-Your-Work)
-- [Signing commits
-](https://docs.github.com/en/github/authenticating-to-github/signing-commits)
+```sh
+npm run build
+npm start
+```
+or
+```sh
+yarn build
+yarn start
+```
 
+## Linting
+
+To check for lint errors:
+
+```sh
+npm run lint
+```
+or
+```sh
+yarn lint
+```
+
+---
+
+## Hosting Backend Services: MCP and Bedrock Instances
+
+The project also requires backend services for full functionality. Specifically, you must run both the **MCP** (Main Control Plane) and **Bedrock** instances alongside the frontend.
+
+### MCP (Main Control Plane)
+
+- The MCP service coordinates and manages core business logic and backend integration.
+- Make sure the MCP service is running and accessible to the frontend before launching the application.
+- Refer to the `mcp/` directory (or relevant documentation) for setup instructions, dependencies, and how to start the MCP instance.
+
+### Bedrock
+
+- Bedrock provides foundational data services, advanced AI/LLM APIs, and RAG support required by the app.
+- This service must also be running and accessible.
+- Refer to the `bedrock/` directory (or relevant documentation) for detailed setup and launch instructions.
+
+**Note:**  
+Adjust environment variables or configuration files as needed to point the frontend to your running MCP and Bedrock services. Check `.env` files in each directory for configuration options.
+
+---
 
 ## License
 
-Copyright 2025 FINOS
+This project is licensed under the [Apache License 2.0](LICENSE).
 
-Distributed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+## Contributing
 
-SPDX-License-Identifier: [Apache-2.0](https://spdx.org/licenses/Apache-2.0)
+Please contact the repository admins or FINOS Labs if you are interested in contributing.
 
+---
 
-
-
-
-
-
-
+© FINOS Labs 2025. All rights reserved.
