@@ -2,7 +2,20 @@ from mcp.server.fastmcp import FastMCP
 import requests
 import json
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timedelta
+import pickle
+import os
+# --- Google Calendar Integration ---
+# NOTE: Requires google-auth, google-auth-oauthlib, google-api-python-client, and credentials.json in the working directory.
+try:
+    from google.oauth2.credentials import Credentials
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+    import pickle
+    import os as _os
+except ImportError:
+    pass  # Calendar tools will error if dependencies are missing
 
 mcp = FastMCP("FinancialVectorDB")
 
@@ -541,6 +554,220 @@ def get_all_transactions() -> str:
             all_transactions.extend(original_data["transactions"])
 
     return json.dumps(all_transactions, indent=2)
+
+@mcp.tool()
+def generate_csv_from_transactions(transactions_json: str, filename: str = "transactions.csv") -> str:
+    """
+    Convert transactions JSON directly to CSV file without external dependencies.
+    
+    Args:
+        transactions_json: JSON string of transaction list
+        filename: Output CSV filename (default: "transactions.csv")
+    
+    Returns:
+        Success message with file path or error message
+    """
+    import csv
+    import os
+    from datetime import datetime
+    
+    try:
+        # Parse the JSON input
+        transactions = json.loads(transactions_json)
+        
+        if not isinstance(transactions, list):
+            return "❌ Input must be a JSON array of transaction objects."
+        
+        if not transactions:
+            return "❌ No transactions found in the input."
+        
+        # Ensure filename ends with .csv
+        if not filename.endswith('.csv'):
+            filename += '.csv'
+        
+        # Get the absolute path for the output file
+        output_path = os.path.abspath(filename)
+        
+        # Write to CSV
+        with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+            # Define the fieldnames based on common transaction fields
+            fieldnames = ['date', 'description', 'type', 'amount']
+            
+            # Check if transactions have additional fields
+            if transactions:
+                sample_transaction = transactions[0]
+                all_keys = set(sample_transaction.keys())
+                # Add any additional fields not in the standard set
+                additional_fields = all_keys - set(fieldnames)
+                fieldnames.extend(sorted(additional_fields))
+            
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            
+            # Write header
+            writer.writeheader()
+            
+            # Write transactions
+            for transaction in transactions:
+                # Ensure all required fields are present
+                row = {}
+                for field in fieldnames:
+                    row[field] = transaction.get(field, '')
+                
+                writer.writerow(row)
+        
+        # Verify file was created and get stats
+        if os.path.exists(output_path):
+            file_size = os.path.getsize(output_path)
+            return f"""✅ CSV file generated successfully!
+
+📄 File Details:
+  • Path: {output_path}
+  • Size: {file_size:,} bytes
+  • Transactions: {len(transactions):,}
+  • Columns: {', '.join(fieldnames)}
+
+🎯 File is ready for use in Excel, Google Sheets, or other data analysis tools!"""
+        else:
+            return "❌ File was not created successfully."
+            
+    except json.JSONDecodeError as e:
+        return f"❌ Invalid JSON format: {str(e)}"
+    except PermissionError:
+        return f"❌ Permission denied: Cannot write to {filename}. Check file permissions."
+    except Exception as e:
+        return f"❌ Error generating CSV: {str(e)}"
+
+@mcp.tool() 
+def get_all_transactions_for_csv() -> str:
+    """
+    Retrieve all transactions in a format ready for CSV conversion.
+    This is a convenience function that gets all transactions and formats them for the CSV generator.
+    
+    Returns:
+        JSON string of all transactions ready for CSV conversion
+    """
+    # Use the existing function to get all transactions
+    transactions_json = get_all_transactions()
+    
+    if transactions_json.startswith("❌") or transactions_json.startswith("📭"):
+        return transactions_json
+    
+    try:
+        # Validate that it's proper JSON
+        transactions = json.loads(transactions_json)
+        return f"✅ Retrieved {len(transactions):,} transactions ready for CSV conversion.\n\nTo generate CSV, use the generate_csv_from_transactions tool with this data."
+    except json.JSONDecodeError:
+        return "❌ Error: Retrieved data is not valid JSON format."
+
+@mcp.tool()
+def add_calendar_reminder(
+    title: str,
+    description: str = "",
+    date: str = "",
+    time: str = "09:00",
+    duration_minutes: int = 60,
+    calendar_id: str = "primary"
+) -> str:
+    """
+    Add a reminder/event to Google Calendar.
+    Requires google-auth, google-auth-oauthlib, google-api-python-client, and credentials.json.
+    Args:
+        title: Event title/summary
+        description: Event description (optional)
+        date: Date in YYYY-MM-DD format (defaults to today if empty)
+        time: Time in HH:MM format (24-hour, defaults to 09:00)
+        duration_minutes: Event duration in minutes (defaults to 60)
+        calendar_id: Calendar ID (defaults to 'primary')
+    Returns:
+        Success message with event details or error message
+    """
+    try:
+        service = get_calendar_service()
+        if not date:
+            event_date = datetime.now().date()
+        else:
+            event_date = datetime.strptime(date, "%Y-%m-%d").date()
+        event_time = datetime.strptime(time, "%H:%M").time()
+        start_datetime = datetime.combine(event_date, event_time)
+        end_datetime = start_datetime + timedelta(minutes=duration_minutes)
+        start_iso = start_datetime.isoformat()
+        end_iso = end_datetime.isoformat()
+        event = {
+            'summary': title,
+            'description': description,
+            'start': {
+                'dateTime': start_iso,
+                'timeZone': 'UTC',
+            },
+            'end': {
+                'dateTime': end_iso,
+                'timeZone': 'UTC',
+            },
+            'reminders': {
+                'useDefault': False,
+                'overrides': [
+                    {'method': 'popup', 'minutes': 10},
+                    {'method': 'email', 'minutes': 60},
+                ],
+            },
+        }
+        event_result = service.events().insert(calendarId=calendar_id, body=event).execute()
+        return f"Calendar reminder '{title}' added successfully for {start_datetime.strftime('%Y-%m-%d %H:%M')}. Event ID: {event_result.get('id')}"
+    except Exception as e:
+        return f"Error adding calendar reminder: {str(e)}"
+
+@mcp.tool()
+def list_upcoming_events(max_results: int = 10, calendar_id: str = "primary") -> str:
+    """
+    List upcoming events from Google Calendar.
+    Requires google-auth, google-auth-oauthlib, google-api-python-client, and credentials.json.
+    Args:
+        max_results: Maximum number of events to return (defaults to 10)
+        calendar_id: Calendar ID (defaults to 'primary')
+    Returns:
+        List of upcoming events or error message
+    """
+    try:
+        service = get_calendar_service()
+        now = datetime.utcnow().isoformat() + 'Z'
+        events_result = service.events().list(
+            calendarId=calendar_id,
+            timeMin=now,
+            maxResults=max_results,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        events = events_result.get('items', [])
+        if not events:
+            return "No upcoming events found."
+        event_list = []
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            summary = event.get('summary', 'No title')
+            event_list.append(f"- {summary} at {start}")
+        return "Upcoming events:\n" + "\n".join(event_list)
+    except Exception as e:
+        return f"Error listing events: {str(e)}"
+
+def get_calendar_service():
+    """
+    Get authenticated Google Calendar service.
+    Requires credentials.json in the working directory.
+    """
+    creds = None
+    if _os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+    service = build('calendar', 'v3', credentials=creds)
+    return service
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

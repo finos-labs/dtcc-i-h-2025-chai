@@ -31,6 +31,16 @@ chat_bedrock = ChatBedrock(
     }
 )
 
+python_coder = ChatBedrock(
+    model_id="anthropic.claude-3-5-sonnet-20240620-v1:0",
+    region_name=os.getenv("AWS_REGION", "us-east-2"),
+    model_kwargs={
+        "max_tokens": 8192,
+        "temperature": 0.5,
+        "top_p": 1,
+    }
+)
+
 app = FastAPI()
 
 # Add CORS middleware
@@ -51,6 +61,10 @@ Format your text properly and neatly using newlines and bullet points where appr
 Do not hallucinate\n
 """
 
+pythonPrompt = """
+You are a Python coding agent that can write and execute Python code to solve problems. You will receive a message containing a coding task or question. Your task is to write the necessary Python code to address the request and provide the output. Only output the code and the result of the code execution, do not include any additional text or explanations.
+"""
+
 @app.post("/ask")
 async def ask_agent(request: AskRequest):
     """
@@ -68,6 +82,28 @@ async def ask_agent(request: AskRequest):
                 # Create and run the agent
                 agent = create_react_agent(chat_bedrock, tools)
                 agent_response = await agent.ainvoke({"messages": f"{promt}\n{message}"})
+                print(f"Agent response: {agent_response}")
+                return agent_response
+    result = await run_agent(request.message)
+    return {"response": result['messages'][-1].content}
+
+@app.post("/python")
+async def ask_agent(request: AskRequest):
+    """
+    Send a message to the LLM+MCP agent and get the response.
+    """
+    async def run_agent(message: str):
+        async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                # Initialize the connection
+                await session.initialize()
+
+                # Get tools
+                tools = await load_mcp_tools(session)
+
+                # Create and run the agent
+                agent = create_react_agent(python_coder, tools)
+                agent_response = await agent.ainvoke({"messages": f"{pythonPrompt}\n{message}"})
                 print(f"Agent response: {agent_response}")
                 return agent_response
     result = await run_agent(request.message)
